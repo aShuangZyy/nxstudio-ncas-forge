@@ -1,0 +1,13 @@
+# generated locally, never commit
+certs/
+rules.json
+*.log
+*.pfx
+run_stdout.txt
+run_stderr.txt
+session*.json
+
+# python
+__pycache__/
+*.pyc
+logs/
