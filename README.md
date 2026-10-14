@@ -36,17 +36,20 @@ NX Studio 启动
 git clone <this repo> nxstudio-ncas-forge
 cd nxstudio-ncas-forge
 
-# 1) 一次性准备：生成证书 + 信任（当前用户）+ 生成伪造规则
-powershell -NoProfile -ExecutionPolicy Bypass -File setup.ps1
-
-# 2) 自检：环境 / 证书 / 代理 / 伪造响应是否正常（不改系统设置）
-powershell -NoProfile -ExecutionPolicy Bypass -File check.ps1
-
-# 3) 启动（NX Studio 退出后自动还原代理并停掉代理进程）
+# 一条命令搞定：首次会自动生成证书/信任/rules.json 并先自检，然后启动 NX Studio
+# （NX Studio 退出后自动还原代理、停掉本地代理进程）
 powershell -NoProfile -ExecutionPolicy Bypass -File start-nxstudio.ps1
 
-# 可选：在桌面放一个双击即用的图标
+# 可选：在桌面放一个双击即用的图标（图标调用的就是上面这条）
 powershell -NoProfile -ExecutionPolicy Bypass -File make-shortcut.ps1
+```
+
+分步执行（调试时用）：
+
+```powershell
+powershell ... -File setup.ps1                                  # 只做一次性准备
+powershell ... -File check.ps1                                  # 只自检（-Quick 跳过真代理往返）
+powershell ... -File start-nxstudio.ps1 -NoSetup -SkipCheck     # 不做前置检查，直接启动
 ```
 
 指定安装路径 / 换端口：

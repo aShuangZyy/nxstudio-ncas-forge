@@ -9,6 +9,10 @@
     Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File start-nxstudio.ps1
             powershell ... -File start-nxstudio.ps1 -App "D:\Nikon\NXStudio\NXStudio.exe"
             powershell ... -File start-nxstudio.ps1 -KeepProxy      (do not restore the proxy)
+            powershell ... -File start-nxstudio.ps1 -NoSetup -SkipCheck    (raw launch)
+
+    On the first run setup.ps1 (certificates + rules.json + CA trust) and a
+    quick check.ps1 self test happen automatically, so one command is enough.
 #>
 [CmdletBinding()]
 param(
@@ -16,7 +20,9 @@ param(
     [string]$App,
     [int]$Port = 8899,
     [int]$Timeout = 3600,
-    [switch]$KeepProxy
+    [switch]$KeepProxy,
+    [switch]$NoSetup,
+    [switch]$SkipCheck
 )
 $ErrorActionPreference = 'Stop'
 if (-not $RepoRoot) { $RepoRoot = $PSScriptRoot }
@@ -25,11 +31,26 @@ if (-not $RepoRoot) { $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Pat
 
 $py = Find-Python
 if (-not $py) { Write-Host 'ERROR: Python 3 not found.' -ForegroundColor Red; exit 1 }
-foreach ($need in 'rules.json', 'certs\leaf.pem', 'certs\leaf.key.pem') {
-    if (-not (Test-Path (Join-Path $RepoRoot $need))) {
-        Write-Host ("ERROR: {0} is missing - run setup.ps1 first." -f $need) -ForegroundColor Red
+
+# ---- preflight: one time setup + a quick self test (skip with the switches) ----
+$missing = @('rules.json', 'certs\leaf.pem', 'certs\leaf.key.pem') |
+    Where-Object { -not (Test-Path (Join-Path $RepoRoot $_)) }
+$caTrusted = @(Get-ChildItem Cert:\CurrentUser\Root -ErrorAction SilentlyContinue |
+    Where-Object { $_.Subject -match 'NX-Forge-CA' }).Count -gt 0
+
+if ((@($missing).Count -gt 0) -or (-not $caTrusted)) {
+    if ($NoSetup) {
+        Write-Host ("ERROR: not set up yet - missing {0} (run setup.ps1, or drop -NoSetup)." -f ((@($missing) + @('CA trust')) -join ', ')) -ForegroundColor Red
         exit 1
     }
+    Write-Host 'first run - creating certificates, trusting the CA and building rules.json ...'
+    & (Join-Path $RepoRoot 'setup.ps1') -RepoRoot $RepoRoot
+    if ($LASTEXITCODE -ne 0) { Write-Host 'ERROR: setup.ps1 failed.' -ForegroundColor Red; exit 1 }
+}
+
+if (-not $SkipCheck) {
+    & (Join-Path $RepoRoot 'check.ps1') -RepoRoot $RepoRoot -Port $Port -Quick
+    if ($LASTEXITCODE -ne 0) { Write-Host 'ERROR: check.ps1 reported a problem.' -ForegroundColor Red; exit 1 }
 }
 $exe = Get-NxStudioPath -Hint $App
 if (-not $exe) {

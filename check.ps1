@@ -4,11 +4,15 @@
     explicit -Proxy argument only.
 
     Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File check.ps1
+            powershell ... -File check.ps1 -Quick      (skip the proxy round trip)
+
+    Exit code: 0 = everything is fine, 2 = something failed.
 #>
 [CmdletBinding()]
 param(
     [string]$RepoRoot,
-    [int]$Port = 8899
+    [int]$Port = 8899,
+    [switch]$Quick
 )
 $ErrorActionPreference = 'Continue'
 if (-not $RepoRoot) { $RepoRoot = $PSScriptRoot }
@@ -66,6 +70,10 @@ Report 'NX Studio' ($null -ne $nx) ($(if ($nx) { "{0}  ({1})" -f $nx, $nxVer } e
 $busy = Test-Listening -Port $Port
 if ($busy) { Write-Host ("[info] port {0} is already in use - start-nxstudio.ps1 will reuse it" -f $Port) }
 
+if ($Quick) {
+    Show-Banner 'functional test'
+    Write-Host '[skip] the proxy round trip (-Quick)' -ForegroundColor DarkGray
+} else {
 Show-Banner 'functional test (through the proxy, system settings untouched)'
 $started = $false
 if (-not $busy) {
@@ -108,7 +116,8 @@ if ($started) {
 if ($started -and -not $busy) {
     foreach ($p in Get-ForgeMitmProcess) { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue }
     Write-Host '[info] test MITM stopped'
-}
+}}
+
 
 Show-Banner 'summary'
 if ($fails -eq 0) { Write-Host 'all checks passed.' -ForegroundColor Green; exit 0 }
